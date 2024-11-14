@@ -4,6 +4,7 @@ namespace Webkul\Shipping\Providers;
 
 use Illuminate\Foundation\AliasLoader;
 use Illuminate\Support\ServiceProvider;
+use Webkul\Shipping\CTT\CTTService;
 use Webkul\Shipping\Facades\Shipping as ShippingFacade;
 use Webkul\Shipping\Shipping;
 
@@ -17,6 +18,7 @@ class ShippingServiceProvider extends ServiceProvider
     public function boot()
     {
         include __DIR__.'/../Http/helpers.php';
+        $this->loadRoutesFrom(__DIR__ . '/../routes/routes.php');
     }
 
     /**
@@ -29,6 +31,10 @@ class ShippingServiceProvider extends ServiceProvider
         $this->registerFacades();
 
         $this->registerConfig();
+
+        $this->app->bind(CTTService::class, function ($app) {
+            return new CTTService();
+        });
     }
 
     /**
