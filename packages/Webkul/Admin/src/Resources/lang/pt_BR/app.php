@@ -3823,6 +3823,14 @@ return [
                             'title'     => 'Tipo',
                         ],
                     ],
+
+                    'dhl' => [
+                        'description' => 'Descrição',
+                        'page-title'  => 'DHL',
+                        'status'      => 'Status',
+                        'title'       => 'Título',
+                        'title-info'  => 'DHL é uma empresa multinacional de serviços de transporte e logística com sede na Alemanha. Eles oferecem uma ampla gama de serviços de transporte e logística, incluindo envio de pacotes, serviços de logística de e-commerce e serviços de transporte de mercadorias.',
+                    ],
                 ],
 
                 'payment-methods' => [

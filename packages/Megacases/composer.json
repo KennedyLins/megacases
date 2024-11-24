@@ -1,0 +1,31 @@
+{
+    "name": "megacases/dhl-shipping",
+    "description": "Provides DHL Shipping methods for shipping the products.",
+    "keywords": [
+        "bagisto",
+        "dhl",
+        "dhl shipping"
+    ],
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Ikaro C. Laborda"
+        }
+    ],
+    "require": {
+        "konekt/concord": "^1.2"
+    },
+    "autoload": {
+        "psr-4": {
+            "Megacases\\DHLShipping\\": "src/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Megacases\\DHLShipping\\Providers\\DHLShippingServiceProvider"
+            ]
+        }
+    },
+    "minimum-stability": "dev"
+}

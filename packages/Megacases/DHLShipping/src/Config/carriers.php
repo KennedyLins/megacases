@@ -1,0 +1,13 @@
+<?php
+
+return [
+    'dhlshipping' => [
+        'code'         => 'dhl',
+        'title'        => 'DHL Shipping',
+        'description'  => 'DHL Shipping',
+        'active'       => true,
+        'default_rate' => '15',
+        'type'         => 'per_unit',
+        'class'        => 'Megacases\DHLShipping\Carriers\DHLShipping',
+    ],
+];
