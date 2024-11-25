@@ -28,6 +28,8 @@ class Kernel extends ConsoleKernel
         $schedule->command('indexer:index --type=price')->dailyAt('00:01');
 
         $schedule->command('product:price-rule:index')->dailyAt('00:01');
+
+        $schedule->command('abandonedcart:send-emails')->hourly();
     }
 
     /**

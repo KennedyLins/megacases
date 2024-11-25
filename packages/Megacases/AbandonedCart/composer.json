@@ -1,0 +1,26 @@
+{
+    "name": "megacases/abandonedcart",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Ikaro C. Laborda",
+            "email": "iclaborda@msn.com"
+        }
+    ],
+    "require": {
+    },
+    "autoload": {
+        "psr-4": {
+            "Megacases\\AbandonedCart\\": "src/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Megacases\\AbandonedCart\\Providers\\AbandonedCartServiceProvider"
+            ],
+            "aliases": { }
+        }
+    },
+    "minimum-stability": "dev"
+}
