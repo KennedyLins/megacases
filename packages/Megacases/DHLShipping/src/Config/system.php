@@ -28,7 +28,7 @@ return [
 
             ], [
                 'name'          => 'description',
-                'title'         => 'admin::app.admin.system.description',
+                'title'         => 'dhl::app.admin.system.description',
                 'type'          => 'textarea',
                 'channel_based' => true,
                 'locale_based'  => false,
@@ -41,7 +41,7 @@ return [
                 'locale_based'  => true,
             ], [
                 'name'          => 'is_calculate_tax',
-                'title'         => 'admin::app.admin.system.calculate-tax',
+                'title'         => 'dhl::app.admin.system.calculate-tax',
                 'type'          => 'boolean',
                 'validation'    => 'required',
                 'channel_based' => false,
@@ -274,14 +274,7 @@ return [
                 'type'          => 'multiselect',
                 'channel_based' => true,
                 'locale_based'  => true,
-                'repository'    => 'Webkul\DHLShipping\Repositories\DhlDetailRepository@getCountries',
-            ],
-            [
-                'name'          => 'active',
-                'title'         => 'admin::app.configuration.index.sales.shipping-methods.dhl.status',
-                'type'          => 'boolean',
-                'channel_based' => true,
-                'locale_based'  => false,
+                'repository'    => 'Megacases\DHLShipping\Repositories\DhlDetailRepository@getCountries',
             ],
         ],
     ],

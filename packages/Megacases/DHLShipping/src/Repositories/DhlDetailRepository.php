@@ -4,7 +4,6 @@ namespace Megacases\DHLShipping\Repositories;
 
 use Illuminate\Container\Container as App;
 use Webkul\Checkout\Facades\Cart;
-use Webkul\Core\Eloquent\Repository;
 use Webkul\Core\Repositories\CountryRepository;
 
 class DhlDetailRepository
@@ -33,7 +32,7 @@ class DhlDetailRepository
      *
      * @return mixed
      */
-    public function getShippingAddressAttribute()
+    public function getShippingAddressAttribute(): mixed
     {
         $cart = Cart::getCart();
 
@@ -45,7 +44,7 @@ class DhlDetailRepository
         return $address;
     }
 
-    public function ValidItems($cartItems)
+    public function ValidItems($cartItems): array
     {
         $adminProducts = [];
 
@@ -62,9 +61,9 @@ class DhlDetailRepository
     /**
      * Specify Model class name
      *
-     * @return mixed
+     * @return array
      */
-    public function getCountries()
+    public function getCountries(): array
     {
         $countries = [];
 
