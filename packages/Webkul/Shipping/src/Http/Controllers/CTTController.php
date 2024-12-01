@@ -3,8 +3,8 @@
 namespace Webkul\Shipping\Http\Controllers;
 
 use App\Http\Controllers\Controller;
-use Webkul\Shipping\CTT\CTTService;
 use Illuminate\Http\Request;
+use Webkul\Shipping\CTT\CTTService;
 
 class CTTController extends Controller
 {
@@ -15,26 +15,39 @@ class CTTController extends Controller
         $this->cttService = $cttService;
     }
 
-    public function calculateShipping(Request $request)
-    {
-        $parameters = $request->all();
-        $rate = $this->cttService->calculateShippingRate($parameters);
-
-        return response()->json($rate);
-    }
-
     public function createShipment(Request $request)
     {
-        $shipmentData = $request->all();
-        $shipment = $this->cttService->createShipment($shipmentData);
+        $data = $request->only(['customer_id', 'order_id']);
 
-        return response()->json($shipment);
+        try {
+            $response = $this->cttService->createShipment($data['customer_id'], $data['order_id'], 'PT');
+            return response()->json([
+                'success' => true,
+                'data' => $response,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 500);
+        }
     }
 
-    public function trackShipment($trackingId)
+    public function closeShipment(Request $request)
     {
-        $trackingInfo = $this->cttService->trackShipment($trackingId);
+        $shipmentId = $request->input('shipment_id');
 
-        return response()->json($trackingInfo);
+        try {
+            $response = $this->cttService->closeShipment($shipmentId);
+            return response()->json([
+                'success' => true,
+                'data' => $response,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 500);
+        }
     }
 }

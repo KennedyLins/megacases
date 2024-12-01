@@ -32,7 +32,7 @@ class ShippingServiceProvider extends ServiceProvider
 
         $this->registerConfig();
 
-        $this->app->bind(CTTService::class, function ($app) {
+        $this->app->bind(CTTService::class, function () {
             return new CTTService();
         });
     }
