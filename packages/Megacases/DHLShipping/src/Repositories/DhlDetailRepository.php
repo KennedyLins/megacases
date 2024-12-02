@@ -68,7 +68,6 @@ class DhlDetailRepository
         $countries = [];
 
         foreach ($this->countryRepository->all() as $country) {
-
             $countries[$country->code] = $country->name;
         }
 

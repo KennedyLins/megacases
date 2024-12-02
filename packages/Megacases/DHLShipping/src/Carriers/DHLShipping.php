@@ -2,6 +2,9 @@
 
 namespace Megacases\DHLShipping\Carriers;
 
+use GuzzleHttp\Exception\GuzzleException;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Webkul\Checkout\Facades\Cart;
 use Webkul\Checkout\Models\CartShippingRate;
@@ -10,7 +13,7 @@ use Webkul\Shipping\Carriers\AbstractShipping;
 /**
  * Class Rate.
  */
-class Dhl extends AbstractShipping
+class DHLShipping extends AbstractShipping
 {
     /**
      * DHLShipping helper
@@ -33,65 +36,73 @@ class Dhl extends AbstractShipping
      */
     protected $code = 'dhl';
 
+
     /**
      * Returns rate for DHL Shipping
      *
      * @return array
      */
-    public function calculate()
+    public function calculate(): bool|array
     {
-
-        if (! $this->isAvailable()) {
+        if (!$this->isAvailable()) {
             return false;
         }
 
         $cart = Cart::getCart();
 
-        $allowedCountries = explode(',', core()->getConfigData('sales.carriers.dhl.allowed_country'));
+        $apiKey = core()->getConfigData('sales.carriers.dhl.access_id');
+        $password = core()->getConfigData('sales.carriers.dhl.password');
+        $accountNumber = core()->getConfigData('sales.carriers.dhl.account_number');
+        $origin = [
+            'country' => core()->getConfigData('sales.shipping.origin.country'),
+            'postal_code' => core()->getConfigData('sales.shipping.origin.zipcode'),
+            'city' => core()->getConfigData('sales.shipping.origin.city'),
+        ];
+        $destination = [
+            'country' => $cart->shipping_address->country,
+            'postal_code' => $cart->shipping_address->postcode,
+            'city' => $cart->shipping_address->city,
+        ];
+        $weight = $cart->items->sum('weight');
+        $dimensions = ['length' => 30, 'width' => 20, 'height' => 10]; // Example values
 
-        if (! in_array($cart->shipping_address->country, $allowedCountries)) {
+        $response = Http::withHeaders([
+            'Accept' => 'application/json',
+        ])->withBasicAuth($apiKey, $password)
+            ->get(core()->getConfigData('sales.carriers.dhl.gateway_url') . '/rates', [
+            'accountNumber' => $accountNumber,
+            'originCountryCode' => $origin['country'],
+            'originPostalCode' => $origin['postal_code'],
+            'originCityName' => $origin['city'],
+            'destinationCountryCode' => $destination['country'],
+            'destinationPostalCode' => $destination['postal_code'],
+            'destinationCityName' => $destination['city'],
+            'weight' => $weight,
+            'length' => $dimensions['length'],
+            'width' => $dimensions['width'],
+            'height' => $dimensions['height'],
+            'unitOfMeasurement' => 'metric',
+        ]);
 
+        if ($response->failed()) {
             return false;
         }
 
-        $shippingpricedetail = $this->collectRates();
+        $rates = $response->json()['products'] ?? [];
 
-        if ($shippingpricedetail == false) {
-
-            return false;
+        $shippingMethods = [];
+        foreach ($rates as $rate) {
+            $result = new CartShippingRate;
+            $result->carrier = $this->code;
+            $result->carrier_title = $rate['productName'];
+            $result->method = $rate['productCode'];
+            $result->method_title = $rate['productName'];
+            $result->price = $rate['totalPrice'][0]['price'];
+            $result->base_price = $rate['totalPrice'][0]['price'];
+            $shippingMethods[] = $result;
         }
 
-        if ($shippingpricedetail['errormsg'] != '') {
-
-            return false;
-            session()->flash('error', 'something went wrong');
-
-        } else {
-
-            $totalPriceArr = $shippingpricedetail['handlingfee']['totalprice'];
-            $serviceCodeToActualNameMap = $shippingpricedetail['handlingfee']['servicecodetoactualnamemap'];
-            $costArr = $shippingpricedetail['handlingfee']['costarr'];
-
-            $shippingMethods = [];
-
-            foreach ($totalPriceArr as $method=>$price) {
-
-                $result = new CartShippingRate;
-                $result->carrier = $method;
-                $result->carrier_title = $serviceCodeToActualNameMap[$method];
-                $result->method = 'dhl';
-                $result->method_title = $this->getConfigData('title');
-                $result->method_description = $serviceCodeToActualNameMap[$method];
-                $result->price = core()->convertPrice($price);
-                $result->is_calculate_tax = $this->getConfigData('is_calculate_tax');
-                $result->base_price = $price;
-                $shippingMethods[] = $result;
-
-            }
-
-            return $shippingMethods;
-        }
-
+        return $shippingMethods;
     }
 
     /**
@@ -158,54 +169,106 @@ class Dhl extends AbstractShipping
      */
     public function collectRates()
     {
-
-        if (! core()->getConfigData('sales.carriers.dhl.active')) {
+        if (!core()->getConfigData('sales.carriers.dhl.active')) {
             return false;
         }
 
         $cart = Cart::getCart();
-
-        $shippostaldetail = $cart->shipping_address;
-
-        $shippingdetail = [];
-
-        $validCartItems = $this->getValidCartItems($cart->items()->get());
-
-        foreach ($validCartItems as $item) {
-
-            $partner = 0;
-
-            if (count($shippingdetail) == 0) {
-                array_push($shippingdetail, ['seller_id'=>$partner, 'items_weight'=>$item->weight, 'product_name'=>$item->name, 'qty'=>$item->quantity, 'item_id'=>$item->id, 'price'=>$item->total]);
-            } else {
-
-                $shipinfoflag = true;
-                $index = 0;
-
-                foreach ($shippingdetail as $itemship) {
-                    if ($itemship['seller_id'] == $partner) {
-
-                        $itemship['items_weight'] = $itemship['items_weight'] + ($item->weight * $item->quantity);
-                        $itemship['product_name'] = $itemship['product_name'].','.$item->name;
-                        $itemship['qty'] = $itemship['qty'] + $item->quantity;
-                        $itemship['item_id'] = $itemship['item_id'].','.$item->id;
-                        $itemship['price'] = $itemship['price'] + $item->price;
-                        $shippingdetail[$index] = $itemship;
-                        $shipinfoflag = false;
-                    }
-                    $index++;
-                }
-
-                if ($shipinfoflag == true) {
-                    array_push($shippingdetail, ['seller_id'=>$partner, 'items_weight'=>$item->weight, 'product_name'=>$item->name, 'qty'=>$item->quantity, 'item_id'=>$item->id, 'price'=>$item->price]);
-                }
-            }
+        if (!$cart || !$cart->shipping_address) {
+            return false; // Ensure there's a cart and a shipping address.
         }
 
-        $shippingpricedetail = $this->getShippingPricedetail($shippingdetail, $shippostaldetail);
+        $shippingAddress = $cart->shipping_address;
 
-        return $shippingpricedetail;
+        // Prepare shipment details
+        $validCartItems = $this->getValidCartItems($cart->items()->get());
 
+        $totalWeight = array_reduce($validCartItems, function ($carry, $item) {
+            return $carry + ($item->weight * $item->quantity);
+        }, 0);
+
+        $dimensions = $this->getPackageDimensions($validCartItems);
+
+        $payload = [
+            'accountNumber'         => core()->getConfigData('sales.carriers.dhl.account_number'),
+            'originCountryCode'     => core()->getConfigData('sales.carriers.dhl.origin_country'),
+            'originPostalCode'      => core()->getConfigData('sales.carriers.dhl.origin_zip'),
+            'originCityName'        => core()->getConfigData('sales.carriers.dhl.origin_city'),
+            'destinationCountryCode'=> $shippingAddress->country,
+            'destinationPostalCode' => $shippingAddress->postcode,
+            'destinationCityName'   => $shippingAddress->city,
+            'weight'                => $totalWeight,
+            'length'                => $dimensions['length'],
+            'width'                 => $dimensions['width'],
+            'height'                => $dimensions['height'],
+            'plannedShippingDate'   => now()->toDateString(),
+            'unitOfMeasurement'     => 'metric',
+            'isCustomsDeclarable'   => false, // Adjust based on requirements
+            'nextBusinessDay'       => true,  // Adjust based on preferences
+        ];
+
+        $response = $this->callDHLApi($payload);
+
+        if (!$response || empty($response['products'])) {
+            return false; // Handle errors or no products found
+        }
+
+        return $this->formatRates($response['products']);
+    }
+
+    /**
+     * Prepare package dimensions based on cart items.
+     */
+    protected function getPackageDimensions($items): array
+    {
+        // You can adjust logic here to calculate package dimensions.
+        return [
+            'length' => 50, // Example value
+            'width'  => 30, // Example value
+            'height' => 20, // Example value
+        ];
+    }
+
+    /**
+     * Call DHL API to retrieve rates.
+     */
+    protected function callDHLApi($payload)
+    {
+        $apiUrl = config('dhl.api_base_url') . '/rates';
+        $client = new \GuzzleHttp\Client();
+
+        try {
+            $response = $client->request('GET', $apiUrl, [
+                'headers' => [
+                    'Accept' => 'application/json',
+                ],
+                'auth' => [
+                    config('dhl.api_username'),
+                    config('dhl.api_password')
+                ],
+                'query' => $payload,
+            ]);
+
+            return json_decode($response->getBody(), true);
+        } catch (\Exception | GuzzleException $e) {
+            // Log error for debugging
+            Log::error('DHL API Error: ' . $e->getMessage());
+            return null;
+        }
+    }
+
+    protected function formatRates($products): array
+    {
+        $rates = [];
+        foreach ($products as $product) {
+            $rates[] = [
+                'code'  => $product['productCode'],
+                'title' => $product['productName'],
+                'price' => $product['totalPrice'][0]['price'],
+            ];
+        }
+
+        return $rates;
     }
 
     public function getValidCartItems($cartItems)

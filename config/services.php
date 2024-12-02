@@ -81,9 +81,8 @@ return [
     ],
 
     'dhl' => [
-        'client_id'     => env('DHL_CLIENT_ID'),
-        'client_secret' => env('DHL_CLIENT_SECRET'),
-        'redirect'      => env('DHL_CALLBACK_URL'),
-        'url'           => env('DHL_URL'),
+        'client_key'     => env('DHL_API_USERNAME'),
+        'client_secret' => env('DHL_API_PASSWORD'),
+        'api_url' => env('DHL_API_URL'),
     ],
 ];

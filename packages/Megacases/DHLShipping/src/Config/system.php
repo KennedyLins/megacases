@@ -40,6 +40,31 @@ return [
                 'channel_based' => false,
                 'locale_based'  => true,
             ], [
+                'name'          => 'gateway_url',
+                'title'         => 'dhl::app.admin.system.gateway-url',
+                'type'          => 'text',
+                'validation'    => 'required',
+                'channel_based' => false,
+                'locale_based'  => false,
+
+            ],
+               [
+                'name'          => 'origin_country',
+                'title'         => 'dhl::app.admin.system.origin-country',
+                'type'          => 'select',
+                'validation'    => 'required',
+                'options'       => \Megacases\DHLShipping\Helpers\DHLShippingHelper::getCountries(),
+                'channel_based' => false,
+                'locale_based'  => false,
+            ], [
+                'name'          => 'origin_zip',
+                'title'         => 'dhl::app.admin.system.origin-zip',
+                'type'          => 'text',
+                'validation'    => 'required',
+                'channel_based' => false,
+                'locale_based'  => false,
+            ],
+            [
                 'name'          => 'is_calculate_tax',
                 'title'         => 'dhl::app.admin.system.calculate-tax',
                 'type'          => 'boolean',
@@ -76,21 +101,6 @@ return [
                 'validation'    => 'required_if:active,1',
                 'channel_based' => false,
                 'locale_based'  => true,
-            ], [
-                'name'          => 'weight_unit',
-                'title'         => 'dhl::app.admin.system.weight-unit',
-                'type'          => 'select',
-                'channel_based' => false,
-                'locale_based'  => true,
-                'options'       => [
-                    [
-                        'title' => 'dhl::app.admin.system.kilograms',
-                        'value' => 'KG',
-                    ], [
-                        'title' => 'dhl::app.admin.system.pounds',
-                        'value' => 'LB',
-                    ],
-                ],
             ], [
                 'name'          => 'dimension_unit',
                 'title'         => 'dhl::app.admin.system.dimension-unit',
@@ -274,7 +284,7 @@ return [
                 'type'          => 'multiselect',
                 'channel_based' => true,
                 'locale_based'  => true,
-                'repository'    => 'Megacases\DHLShipping\Repositories\DhlDetailRepository@getCountries',
+                'options'       => \Megacases\DHLShipping\Helpers\DHLShippingHelper::getCountries()
             ],
         ],
     ],

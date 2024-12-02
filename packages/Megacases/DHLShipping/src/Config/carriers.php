@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'dhlshipping' => [
+    'dhl' => [
         'code'         => 'dhl',
         'title'        => 'DHL Shipping',
         'description'  => 'DHL Shipping',

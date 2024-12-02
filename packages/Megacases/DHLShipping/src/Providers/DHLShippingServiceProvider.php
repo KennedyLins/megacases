@@ -3,6 +3,8 @@
 namespace Megacases\DHLShipping\Providers;
 
 use Illuminate\Support\ServiceProvider;
+use Webkul\Core\Contracts\Country;
+use Webkul\Core\Repositories\CountryRepository;
 use Webkul\Shipping\Shipping as DhlShipping;
 
 class DHLShippingServiceProvider extends ServiceProvider
