@@ -1,0 +1,11 @@
+{
+    "name": "webkul/moloni-integration",
+    "autoload": {
+        "psr-4": {
+            "Webkul\\MoloniIntegration\\": "src/"
+        }
+    },
+    "require": {
+        "guzzlehttp/guzzle": "^7.0"
+    }
+}
