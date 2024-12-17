@@ -5,6 +5,8 @@ namespace Webkul\MoloniIntegration\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Webkul\MoloniIntegration\Services\MoloniService;
+use Webkul\Checkout\Models\Cart;
+use Webkul\Sales\Models\Invoice;
 
 class MoloniController extends Controller
 {
@@ -16,103 +18,113 @@ class MoloniController extends Controller
     }
 
     /**
-     * Cria uma nova fatura no Moloni com base em uma compra do e-commerce.
+     * Endpoint para processar carrinho e criar fatura no Moloni.
      */
-    public function createInvoice(Request $request)
-    {
-        // Validar os dados de entrada
-        $validated = $request->validate([
-            'customer' => 'required|array',
-            'items' => 'required|array',
-            'total' => 'required|numeric',
-        ]);
-
-        // Garantir que o cliente existe no Moloni
-        $customer = $this->moloniService->findOrCreateCustomer($validated['customer']);
-
-        // Garantir que os produtos existem no Moloni
-        foreach ($validated['items'] as &$item) {
-            $product = $this->moloniService->findOrCreateProduct($item);
-            $item['product_id'] = $product['product_id'];
-        }
-
-        // Criar a fatura no Moloni
-        $invoiceData = [
-            'customer_id' => $customer['customer_id'],
-            'items' => $validated['items'],
-            'total' => $validated['total'],
-            'date' => date('Y-m-d'),
-        ];
-        $response = $this->moloniService->createInvoice($invoiceData);
-
-        return response()->json($response);
-    }
-
     public function processCart(Request $request)
     {
-        // Validar e buscar o carrinho
+        // Validar entrada
         $validated = $request->validate([
             'cart_id' => 'required|integer|exists:cart,id',
         ]);
 
-        $cart = Cart::with('customer', 'items.product')->findOrFail($validated['cart_id']);
+        try {
+            // Buscar carrinho
+            $cart = Cart::with(['customer', 'items.product', 'billing_address'])->findOrFail($validated['cart_id']);
+            $customer = $cart->customer;
+            $billingAddress = $cart->billing_address;
 
-        // Buscar o cliente
-        $customer = $cart->customer;
-
-        // Buscar os itens do carrinho
-        $items = $cart->items;
-
-        // Preparar os dados do cliente para o Moloni
-        $customerData = [
-            'vat' => $customer->vat ?? '999999990', // Exemplo de NIF, ajuste conforme necessidade
-            'number' => $customer->id,
-            'name' => $customer->name,
-            'email' => $customer->email,
-            'address' => $customer->address ?? 'Endereço padrão',
-            'zip_code' => $customer->zip_code ?? '0000-000',
-            'city' => $customer->city ?? 'Cidade padrão',
-            'country_id' => 1, // ID do país (1 para Portugal)
-        ];
-
-        // Preparar os dados dos produtos para o Moloni
-        $productsData = $items->map(function ($item) {
-            return [
-                'category_id' => $item->product->category_id,
-                'type' => 1, // Produto
-                'name' => $item->product->name,
-                'reference' => $item->product->sku ?? $item->product->id,
-                'price' => $item->price,
-                'unit_id' => $item->product->unit_id ?? 1,
-                'has_stock' => 1,
-                'stock' => $item->quantity,
-                'summary' => $item->product->description ?? 'Sem descrição',
-                'exemption_reason' => '0', // Sem isenção
+            // Preparar dados do cliente
+            $customerData = [
+                'vat' => $billingAddress->vat_id ?? '999999990', // Fallback para NIF genérico
+                'number' => $customer->id,
+                'name' => "{$customer->first_name} {$customer->last_name}",
+                'email' => $customer->email,
+                'address' => $billingAddress->address ?? 'Endereço padrão',
+                'zip_code' => $billingAddress->postcode ?? '0000-000',
+                'city' => $billingAddress->city ?? 'Cidade padrão',
+                'country_id' => 1, // Portugal
             ];
-        })->toArray();
 
-        // Chamar o serviço para criar cliente e produtos no Moloni
-        $moloniService = new MoloniService();
+            // Criar cliente no Moloni
+            $moloniCustomer = $this->moloniService->findOrCreateCustomer($customerData);
 
-        $moloniCustomer = $moloniService->findOrCreateCustomer($customerData);
+            // Preparar produtos e atualizar os IDs dos produtos no Moloni
+            $productsData = $cart->items->map(function ($item) {
+                return [
+                    'product_id' => $item->product->moloni_product_id ?? null,
+                    'name' => $item->product->name ?? $item->name,
+                    'summary' => $item->product->description ?? 'Sem descrição',
+                    'qty' => $item->quantity,
+                    'price' => $item->price,
+                    'discount' => 0,
+                    'exemption_reason' => "M01",
+                    'order' => $item->id,
+                ];
+            })->map(function ($product) {
+                // Se o product_id estiver vazio ou inválido, cria o produto no Moloni
+                if (!$product['product_id']) {
+                    $createdProduct = $this->moloniService->findOrCreateProduct($product);
+                    $product['product_id'] = $createdProduct['product_id'];
+                }
+                return $product;
+            })->toArray();
 
-        foreach ($productsData as $productData) {
-            $moloniService->findOrCreateProduct($productData);
+            // Criar fatura no Moloni
+            $invoiceData = [
+                'company_id' => env('MOLONI_COMPANY_ID'),
+                'customer_id' => $moloniCustomer['customer_id'],
+                'date' => date('Y-m-d'),
+                'expiration_date' => now()->addDays(30)->format('Y-m-d'),
+                'document_set_id' => 774008,
+                'products' => $productsData,
+                'status' => 0,
+            ];
+
+            $invoiceResponse = $this->moloniService->createInvoice($invoiceData);
+
+            // Salvar a fatura no banco de dados
+            $invoice = new Invoice();
+            $invoice->increment_id = 'INV-' . time();
+            $invoice->order_id = $cart->id;
+            $invoice->transaction_id = $invoiceResponse['document_id'];
+            $invoice->state = Invoice::STATUS_PAID;
+            $invoice->total_qty = $cart->items->sum('qty');
+            $invoice->grand_total = $cart->grand_total;
+            $invoice->sub_total = $cart->sub_total;
+            $invoice->created_at = now();
+            $invoice->updated_at = now();
+            $invoice->save();
+
+            return response()->json([
+                'success' => true,
+                'document_id' => $invoiceResponse['document_id'],
+                'invoice_id' => $invoice->id,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
         }
+    }
 
-        // Criar a fatura no Moloni
-        $invoiceData = [
-            'customer_id' => $moloniCustomer['customer_id'],
-            'items' => $productsData,
-            'total' => $cart->total,
-            'date' => date('Y-m-d'),
-        ];
-
-        $invoice = $moloniService->createInvoice($invoiceData);
-
-        return response()->json([
-            'success' => true,
-            'invoice' => $invoice,
+    public function getInvoicePDF(Request $request)
+    {
+        $validated = $request->validate([
+            'transaction_id' => 'required|string|exists:invoices,transaction_id',
         ]);
+
+        try {
+            // Buscar a fatura no banco usando o transaction_id
+            $invoice = \Webkul\Sales\Models\Invoice::where('transaction_id', $validated['transaction_id'])->firstOrFail();
+
+            // Chamar o serviço para buscar o PDF
+            $pdfData = $this->moloniService->getInvoicePDF($invoice->transaction_id);
+
+            return response()->json([
+                'success' => true,
+                'base64_pdf' => $pdfData['base64'],
+                'pdf_url' => $pdfData['url'],
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
     }
 }
